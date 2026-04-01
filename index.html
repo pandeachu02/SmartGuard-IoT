@@ -1,0 +1,439 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SmartGuard IoT | Gas Detection Dashboard</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns/dist/chartjs-adapter-date-fns.bundle.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/gaugeJS/dist/gauge.min.js"></script>
+    <style>
+        :root {
+            --primary-blue: #1e3a8a;
+            --primary-blue-dark: #1e40af;
+            --primary-blue-light: #3b82f6;
+            --success-green: #166534;
+            --success-green-light: #22c55e;
+            --warning-yellow: #b45309;
+            --warning-yellow-light: #f59e0b;
+            --danger-red: #dc2626;
+            --danger-red-light: #ef4444;
+            --neutral-gray-50: #f8fafc;
+            --neutral-gray-100: #f1f5f9;
+            --neutral-gray-900: #0f172a;
+            --neutral-gray-800: #1e293b;
+            --neutral-gray-700: #334155;
+
+            --glass-bg: rgba(255, 255, 255, 0.85);
+            --glass-border: rgba(148, 163, 184, 0.3);
+            --glass-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
+            --glass-glow: 0 0 0 1px rgba(255, 255, 255, 0.5);
+
+            --text-primary: #0f172a;
+            --text-secondary: #475569;
+            --text-muted: #64748b;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+            background: linear-gradient(135deg, #eff6ff 0%, #dbeafe 50%, #bfdbfe 100%);
+            color: var(--text-primary);
+            min-height: 100vh;
+            overflow-x: hidden;
+            line-height: 1.6;
+        }
+
+        .particles {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            z-index: 1;
+            opacity: 0.3;
+        }
+
+        .particle {
+            position: absolute;
+            background: rgba(59, 130, 246, 0.4);
+            border-radius: 50%;
+            animation: floatGentle 20s infinite linear;
+        }
+
+        @keyframes floatGentle {
+            0% { transform: translateY(100vh) scale(0); opacity: 0; }
+            10% { opacity: 1; }
+            90% { opacity: 1; }
+            100% { transform: translateY(-100px) scale(1); opacity: 0; }
+        }
+
+        .header {
+            background: var(--glass-bg);
+            backdrop-filter: blur(20px);
+            border: 1px solid var(--glass-border);
+            box-shadow: var(--glass-shadow), var(--glass-glow);
+            padding: 1rem 2rem;
+            position: sticky;
+            top: 0;
+            z-index: 100;
+            border-radius: 0 0 20px 20px;
+        }
+
+        .header-content {
+            max-width: 1400px;
+            margin: 0 auto;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .logo {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            font-size: 1.75rem;
+            font-weight: 700;
+            color: var(--primary-blue);
+            text-decoration: none;
+            letter-spacing: -0.025em;
+        }
+
+        .logo i {
+            font-size: 2rem;
+            color: var(--primary-blue-dark);
+            width: 2.5rem;
+            height: 2.5rem;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 12px;
+            background: rgba(59, 130, 246, 0.1);
+        }
+
+        .main {
+            max-width: 1400px;
+            margin: 2rem auto;
+            padding: 0 2rem;
+            position: relative;
+            z-index: 10;
+        }
+
+        .page-header {
+            text-align: center;
+            margin-bottom: 4rem;
+        }
+
+        .page-title {
+            font-size: 3.5rem;
+            font-weight: 800;
+            background: linear-gradient(135deg, var(--primary-blue-dark), var(--primary-blue-light));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            margin-bottom: 1rem;
+            letter-spacing: -0.02em;
+        }
+
+        .page-subtitle {
+            font-size: 1.25rem;
+            color: var(--text-muted);
+            font-weight: 400;
+            max-width: 600px;
+            margin: 0 auto;
+        }
+
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(340px, 1fr));
+            gap: 2rem;
+            margin-bottom: 4rem;
+        }
+
+        .stat-card {
+            background: var(--glass-bg);
+            backdrop-filter: blur(25px);
+            border: 1px solid var(--glass-border);
+            border-radius: 20px;
+            padding: 2.5rem;
+            box-shadow: var(--glass-shadow);
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            position: relative;
+            overflow: hidden;
+            animation: cardSlide 0.6s ease forwards;
+            opacity: 0;
+            transform: translateY(30px);
+        }
+
+        .stat-card:nth-child(1) { animation-delay: 0.1s; }
+        .stat-card:nth-child(2) { animation-delay: 0.2s; }
+        .stat-card:nth-child(3) { animation-delay: 0.3s; }
+        .stat-card:nth-child(4) { animation-delay: 0.4s; }
+
+        @keyframes cardSlide {
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .stat-card:hover {
+            transform: translateY(-8px);
+            box-shadow: 0 35px 70px -15px rgba(0, 0, 0, 0.3), var(--glass-glow);
+            border-color: rgba(59, 130, 246, 0.3);
+        }
+
+        .stat-header {
+            display: flex;
+            align-items: flex-start;
+            gap: 1.25rem;
+            margin-bottom: 2rem;
+        }
+
+        .stat-icon {
+            width: 64px;
+            height: 64px;
+            border-radius: 16px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.5rem;
+            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.15);
+            flex-shrink: 0;
+        }
+
+        .gauge-card .stat-icon {
+            background: linear-gradient(135deg, var(--danger-red), var(--danger-red-light));
+            color: white;
+        }
+
+        .stat-main h3 {
+            font-size: 0.875rem;
+            color: var(--text-secondary);
+            font-weight: 600;
+            margin-bottom: 0.75rem;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+
+        .stat-value {
+            font-size: 3rem;
+            font-weight: 800;
+            background: linear-gradient(135deg, var(--text-primary), var(--neutral-gray-700));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            line-height: 1;
+            margin-bottom: 0.25rem;
+            letter-spacing: -0.03em;
+        }
+
+        .stat-unit {
+            font-size: 1.125rem;
+            color: var(--text-muted);
+            font-weight: 500;
+        }
+
+        .chart-container {
+            background: var(--glass-bg);
+            backdrop-filter: blur(25px);
+            border: 1px solid var(--glass-border);
+            border-radius: 20px;
+            padding: 2.5rem;
+            box-shadow: var(--glass-shadow);
+            margin-top: 2rem;
+        }
+
+        .chart-title {
+            margin-bottom: 2rem;
+            font-size: 1.5rem;
+            font-weight: 700;
+            text-align: center;
+            color: var(--text-primary);
+        }
+
+        .status-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.75rem;
+            padding: 0.75rem 1.5rem;
+            border-radius: 50px;
+            font-weight: 600;
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(148, 163, 184, 0.3);
+            animation: statusPulse 2s infinite;
+        }
+
+        .status-dot {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            animation: dotPulse 1.5s infinite;
+        }
+
+        @keyframes dotPulse {
+            0%, 100% { transform: scale(1); opacity: 1; }
+            50% { transform: scale(1.4); opacity: 0.8; }
+        }
+
+        .status-safe .status-dot { background: var(--success-green-light); }
+        .status-warning .status-dot { background: var(--warning-yellow-light); }
+        .status-danger .status-dot { background: var(--danger-red-light); }
+
+        .spinner {
+            width: 40px;
+            height: 40px;
+            border: 3px solid rgba(148, 163, 184, 0.3);
+            border-top: 3px solid var(--primary-blue);
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin: 0 auto;
+        }
+
+        @keyframes statusPulse {
+            0%, 100% { transform: scale(1); opacity: 1; }
+            50% { transform: scale(1.05); opacity: 0.9; }
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        #gasMeter {
+            filter: drop-shadow(0 10px 25px rgba(0, 0, 0, 0.15));
+        }
+
+        @media (max-width: 768px) {
+            .page-title { font-size: 2.5rem; }
+            .stats-grid { grid-template-columns: 1fr; }
+            .stat-value { font-size: 2.25rem; }
+            .main { padding: 0 1.5rem; }
+        }
+    </style>
+</head>
+<body>
+    <div class="particles" id="particles"></div>
+
+    <header class="header">
+        <div class="header-content">
+            <a href="#" class="logo">
+                <i class="fas fa-shield-alt"></i>
+                <span>SmartGuard IoT</span>
+            </a>
+            <div class="status-badge status-safe">
+                <div class="status-dot"></div>
+                LIVE DATA
+            </div>
+        </div>
+    </header>
+
+    <main class="main">
+        <div class="page-header">
+            <h1 class="page-title">Gas Detection Dashboard</h1>
+            <p class="page-subtitle">Real-time monitoring with enterprise-grade reliability and AI-powered alerts</p>
+        </div>
+
+        <div class="stats-grid">
+            <!-- Gas Level Gauge -->
+            <div class="stat-card gauge-card">
+                <div class="stat-header">
+                    <div class="stat-icon">
+                        <i class="fas fa-gas-pump"></i>
+                    </div>
+                    <div class="stat-main">
+                        <h3>Current Gas Level</h3>
+                        <div class="stat-value" id="gasValue">0</div>
+                        <div class="stat-unit">PPM</div>
+                    </div>
+                </div>
+                <canvas id="gasMeter" width="400" height="250"></canvas>
+                <div style="margin-top: 1.5rem; color: var(--text-muted); font-size: 0.95rem;">
+                    Last updated <span id="lastUpdate">--</span>
+                </div>
+            </div>
+
+            <!-- Alert Status -->
+            <div class="stat-card">
+                <div class="stat-header">
+                    <div class="stat-icon" style="background: rgba(34, 197, 94, 0.15); color: var(--success-green);">
+                        <i class="fas fa-check-circle"></i>
+                    </div>
+                    <div class="stat-main">
+                        <h3>System Status</h3>
+                        <div class="stat-value" id="alertStatus" style="background: linear-gradient(135deg, var(--success-green), var(--success-green-light)); -webkit-background-clip: text; -webkit-text-fill-color: transparent;">SAFE</div>
+                    </div>
+                </div>
+                <div id="statusBadge" class="status-badge status-safe" style="margin-top: 1.5rem; justify-content: center; width: 100%;">
+                    <div class="status-dot"></div>
+                    <span>All systems operational</span>
+                </div>
+            </div>
+
+            <!-- Remove fan card -->
+            <!-- Ventilation control card removed because you have no fan -->
+
+            <!-- Quick Stats -->
+            <div class="stat-card">
+                <div class="stat-header">
+                    <div class="stat-icon" style="background: rgba(59, 130, 246, 0.15); color: var(--primary-blue);">
+                        <i class="fas fa-chart-line"></i>
+                    </div>
+                    <div class="stat-main">
+                        <h3>24h Analytics</h3>
+                        <div class="stat-value" id="peakValue">0</div>
+                        <div class="stat-unit">Peak PPM</div>
+                    </div>
+                </div>
+                <div style="text-align: center; margin-top: 2rem;">
+                    <div style="font-size: 1.25rem; font-weight: 600; color: var(--success-green);">📈 Trending Safe</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Professional Chart -->
+        <div class="chart-container">
+            <h3 class="chart-title">Real-time Gas Concentration Trends</h3>
+            <canvas id="gasChart" height="350"></canvas>
+        </div>
+    </main>
+
+    <script>
+        const BLYNK_TOKEN = "kknBvWoCIihbDZx2bv258GX_P9YzN6K7";   // 👈 your Blynk token
+        const GAS_PIN = "V0";           // your ESP32 sends gasValue here
+        const ALERT_PIN = "V1";         // 0 = safe, 1 = leak
+
+        let gasGauge, gasChart;
+        let gasHistory = [];
+        let maxHistory = 30;   // keep last 30 values
+
+        function createParticles() {
+            const particlesContainer = document.getElementById('particles');
+            for (let i = 0; i < 30; i++) {
+                const particle = document.createElement('div');
+                particle.className = 'particle';
+                particle.style.left = Math.random() * 100 + '%';
+                particle.style.width = particle.style.height = (Math.random() * 4 + 1) + 'px';
+                particle.style.animationDuration = (Math.random() * 10 + 15) + 's';
+                particle.style.animationDelay = Math.random() * 5 + 's';
+                particlesContainer.appendChild(particle);
+            }
+        }
+
+        function createGauge() {
+            const target = document.getElementById("gasMeter");
+            const opts = {
+                angle: 0.15,
+                lineWidth: 0.44,
+                radiusScale: 0.85,
+                pointer: { length: 0.65, strokeWidth: 0.0
+
+
+
