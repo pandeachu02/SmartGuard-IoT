@@ -6,19 +6,22 @@
 <title>Smart Gas Dashboard</title>
 <style>
   body { font-family: Arial, sans-serif; background: #f4f9ff; padding: 20px; }
-  .card { background: #fff; border-radius: 10px; padding: 20px; margin: 10px 0; box-shadow: 0 2px 8px rgba(0,0,0,0.1);}
+  .card { background: #fff; border-radius: 10px; padding: 20px; margin: 10px 0; box-shadow: 0 2px 8px rgba(0,0,0,0.1); transition: 0.3s; }
   #currentGas { font-size: 32px; font-weight: bold; }
   #status { font-weight: bold; margin-top: 10px; }
+  #maxGas { margin-top: 10px; font-style: italic; }
+  .danger { background: #ffe6e6 !important; } /* Card flashes red in danger */
 </style>
 </head>
 <body>
 
 <h1>Smart Gas Dashboard</h1>
 
-<div class="card">
+<div class="card" id="gasCard">
   <h2>Current Gas Level</h2>
   <div id="currentGas">0</div>
   <div id="status">SAFE ✅</div>
+  <div id="maxGas">Max: 0</div>
 </div>
 
 <div class="card">
@@ -28,13 +31,15 @@
 
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <script>
-  const BLYNK_TOKEN = 'YOUR_BLYNK_TOKEN';  
-  const GAUGE_PIN = 'V0';  // Gauge now uses V0
-  const CHART_PIN = 'V1';  // Chart can stay on V1 if ESP32 sends same value
+  // ✅ Blynk token from your ESP32 project
+  const BLYNK_TOKEN = 'kknBvWoCIihbDZx2bv258GX_P9YzN6K7';  
+  const GAUGE_PIN = 'V0';
+  const CHART_PIN = 'V1';
   const GAUGE_API = `https://blynk.cloud/external/api/get?token=${BLYNK_TOKEN}&pin=${GAUGE_PIN}`;
   const CHART_API = `https://blynk.cloud/external/api/get?token=${BLYNK_TOKEN}&pin=${CHART_PIN}`;
 
   let gasData = []; // Last 20 readings
+  let maxGas = 0;
 
   const ctx = document.getElementById('gasChart').getContext('2d');
   const gasChart = new Chart(ctx, {
@@ -68,17 +73,29 @@
       // Update gauge display
       document.getElementById('currentGas').innerText = gasValue;
 
-      // Update status with same thresholds as gauge color
+      // Update max gas value
+      if (gasValue > maxGas) {
+        maxGas = gasValue;
+        document.getElementById('maxGas').innerText = `Max: ${maxGas}`;
+      }
+
+      // Update status and card color
       const statusEl = document.getElementById('status');
+      const cardEl = document.getElementById('gasCard');
       if (gasValue < 1500) {
         statusEl.innerText = "SAFE ✅";
         statusEl.style.color = "green";
+        cardEl.classList.remove('danger');
       } else if (gasValue < 3000) {
         statusEl.innerText = "WARNING ⚠️";
         statusEl.style.color = "orange";
+        cardEl.classList.remove('danger');
       } else {
         statusEl.innerText = "DANGER ❌";
         statusEl.style.color = "red";
+        cardEl.classList.add('danger');
+        // Optional: play sound alert
+        // playBuzzer();
       }
 
       // Update live trend chart
@@ -90,6 +107,12 @@
     } catch (error) {
       console.error('Error fetching gas data:', error);
     }
+  }
+
+  // Optional buzzer simulation (web sound)
+  function playBuzzer() {
+    const audio = new Audio('https://freesound.org/data/previews/337/337049_3236236-lq.mp3');
+    audio.play();
   }
 
   setInterval(updateGasValue, 2000);
