@@ -1,105 +1,123 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Smart Gas Dashboard</title>
-
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/gaugeJS/dist/gauge.min.js"></script>
-
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&display=swap" rel="stylesheet">
 <style>
-body { font-family: Arial; text-align: center; background:#eef; }
-.card { background:white; padding:20px; margin:20px auto; width:350px; border-radius:10px; }
-
-.safe { color: green; }
-.alert { color: orange; }
-.danger { color: red; }
-
-h1 { color:#1e3a8a; }
+    body {
+        font-family: 'Inter', sans-serif;
+        background: linear-gradient(135deg,#dbeafe,#bfdbfe);
+        color: #0f172a;
+        margin:0; padding:0; text-align:center;
+    }
+    h1 { font-size:2.8rem; margin:20px 0; background: linear-gradient(135deg,#1e3a8a,#3b82f6); -webkit-background-clip:text; -webkit-text-fill-color:transparent; }
+    .card {
+        background: rgba(255,255,255,0.85);
+        backdrop-filter: blur(15px);
+        border-radius: 20px;
+        box-shadow: 0 20px 40px rgba(0,0,0,0.15);
+        margin:20px auto; padding:30px;
+        width: 360px;
+    }
+    #gasValue { font-size: 48px; font-weight:800; margin:10px 0; }
+    #status { font-size: 24px; font-weight:700; margin:15px 0; }
+    .safe { color:#16a34a; }
+    .alert { color:#f59e0b; }
+    .danger { color:#dc2626; }
+    #msg { font-size: 16px; color:#475569; margin-top:5px; }
+    canvas { margin-top:20px; }
 </style>
 </head>
-
 <body>
 
 <h1>🔥 Smart Gas Dashboard</h1>
 
 <div class="card">
-<h2>Gas Value</h2>
-<div id="gasValue" style="font-size:40px;">0</div>
-<div>PPM</div>
+    <h2>Current Gas Level</h2>
+    <div id="gasValue">0</div>
+    <div>PPM</div>
+    <canvas id="gauge"></canvas>
+    <h3 id="status" class="safe">SAFE ✅</h3>
+    <p id="msg">Air quality is normal 👍</p>
+    <p>Last Update: <span id="time">--</span></p>
+</div>
 
-<canvas id="gauge"></canvas>
-
-<h3 id="status" class="safe">SAFE</h3>
-<p id="msg">Air quality is normal</p>
-
-<p>Last Update: <span id="time">--</span></p>
+<div class="card">
+    <h2>Live Trend (Last 20 readings)</h2>
+    <canvas id="chart" height="250"></canvas>
 </div>
 
 <script>
-
-// 🔑 Blynk
+// ===== BLYNK SETUP =====
 const TOKEN = "kknBvWoCIihbDZx2bv258GX_P9YzN6K7";
-const REAL_PIN = "V1";   // REAL value
+const REAL_PIN = "V1"; // actual sensor value
 
-// 🎯 Thresholds
-const SAFE_LIMIT = 1500;
-const ALERT_LIMIT = 2500;
-const MAX_LIMIT = 4000;
+// ===== THRESHOLDS =====
+const THRESHOLD_DANGER = 2500;
 
-// 🎯 Gauge (0–4000)
+// ===== GAUGE =====
 const gauge = new Gauge(document.getElementById("gauge")).setOptions({
     angle: 0.2,
     lineWidth: 0.3,
     pointer: { length: 0.6 },
     staticZones: [
-        {strokeStyle: "green", min: 0, max: SAFE_LIMIT},
-        {strokeStyle: "orange", min: SAFE_LIMIT, max: ALERT_LIMIT},
-        {strokeStyle: "red", min: ALERT_LIMIT, max: MAX_LIMIT}
-    ]
+        { strokeStyle: "#16a34a", min: 0, max: 2000 },
+        { strokeStyle: "#f59e0b", min: 2000, max: THRESHOLD_DANGER },
+        { strokeStyle: "#dc2626", min: THRESHOLD_DANGER, max: 4000 }
+    ],
 });
-
-gauge.maxValue = MAX_LIMIT;
+gauge.maxValue = 4000;
 gauge.set(0);
 
-// 🔄 Fetch data
-async function fetchData() {
-    let res = await fetch(`https://blynk.cloud/external/api/get?token=${TOKEN}&${REAL_PIN}`);
-    let gas = parseInt(await res.text());
+// ===== CHART =====
+let chartData = { labels: [], datasets:[{label:"Gas PPM", data:[], borderColor:"#3b82f6", fill:false, tension:0.3}]};
+const chart = new Chart(document.getElementById("chart"), {type:"line", data:chartData, options:{scales:{y:{min:0,max:4000}}}});
 
-    updateUI(gas);
+// ===== FETCH DATA =====
+async function fetchData() {
+    try {
+        let res = await fetch(`https://blynk.cloud/external/api/get?token=${TOKEN}&${REAL_PIN}`);
+        let gas = parseInt(await res.text());
+        updateUI(gas);
+    } catch(e) { console.log("Error:",e); }
 }
 
-// 🎨 UI Update
-function updateUI(gas) {
-
+// ===== UPDATE DASHBOARD =====
+function updateUI(gas){
     document.getElementById("gasValue").innerText = gas;
     document.getElementById("time").innerText = new Date().toLocaleTimeString();
-
     gauge.set(gas);
 
-    let status = document.getElementById("status");
-    let msg = document.getElementById("msg");
+    const status = document.getElementById("status");
+    const msg = document.getElementById("msg");
 
-    if (gas < SAFE_LIMIT) {
+    if(gas < 2000){
         status.innerText = "SAFE ✅";
         status.className = "safe";
         msg.innerText = "Air quality is normal 👍";
-
-    } else if (gas < ALERT_LIMIT) {
+    } else if(gas < THRESHOLD_DANGER){
         status.innerText = "ALERT ⚠️";
         status.className = "alert";
         msg.innerText = "Gas level rising, stay cautious 😐";
-
     } else {
         status.innerText = "DANGER 🚨";
         status.className = "danger";
         msg.innerText = "Gas leak detected! Take action immediately 🔥";
     }
+
+    // update chart
+    chartData.labels.push(new Date().toLocaleTimeString());
+    chartData.datasets[0].data.push(gas);
+    if(chartData.labels.length > 20){ chartData.labels.shift(); chartData.datasets[0].data.shift(); }
+    chart.update();
 }
 
-// 🔁 Auto update
+// ===== AUTO UPDATE =====
 setInterval(fetchData, 2000);
-
 </script>
 
 </body>
