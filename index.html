@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>SmartGuard IoT</title>
+<title>Smart Gas Dashboard</title>
 
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&display=swap" rel="stylesheet">
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
@@ -12,7 +12,7 @@
 <style>
 body {
     font-family: 'Inter', sans-serif;
-    background: #eaf3ff;
+    background: #eef5ff;
     text-align: center;
 }
 
@@ -21,7 +21,7 @@ body {
     padding: 20px;
     margin: 20px auto;
     border-radius: 15px;
-    width: 320px;
+    width: 340px;
     box-shadow: 0 10px 30px rgba(0,0,0,0.1);
 }
 
@@ -33,7 +33,6 @@ h1 { color: #1e3a8a; }
 }
 
 .safe { color: green; }
-.warning { color: orange; }
 .danger { color: red; }
 
 canvas { margin-top: 20px; }
@@ -61,10 +60,12 @@ canvas { margin-top: 20px; }
 </div>
 
 <script>
-// 🔑 YOUR BLYNK DETAILS
+// 🔑 BLYNK DETAILS
 const BLYNK_TOKEN = "kknBvWoCIihbDZx2bv258GX_P9YzN6K7";
 const GAS_PIN = "V0";
-const ALERT_PIN = "V1";
+
+// 🎯 THRESHOLD
+const THRESHOLD = 2500;
 
 // 📊 CHART SETUP
 let chartData = {
@@ -82,25 +83,28 @@ const chart = new Chart(document.getElementById("chart"), {
     data: chartData
 });
 
-// 🎯 GAUGE SETUP
+// 🎯 GAUGE SETUP (MAX = 4000)
 const gauge = new Gauge(document.getElementById("gauge")).setOptions({
     angle: 0.15,
     lineWidth: 0.3,
     pointer: { length: 0.6, strokeWidth: 0.02 },
-    maxValue: 1000
+    staticZones: [
+        {strokeStyle: "#22c55e", min: 0, max: 2000},   // green
+        {strokeStyle: "#f59e0b", min: 2000, max: 2500},// yellow
+        {strokeStyle: "#ef4444", min: 2500, max: 4000} // red
+    ]
 });
+gauge.maxValue = 4000;
+gauge.setMinValue(0);
 gauge.set(0);
 
 // 🔄 FETCH DATA FROM BLYNK
 async function fetchData() {
     try {
-        let gasRes = await fetch(`https://blynk.cloud/external/api/get?token=${BLYNK_TOKEN}&${GAS_PIN}`);
-        let gas = parseInt(await gasRes.text());
+        let res = await fetch(`https://blynk.cloud/external/api/get?token=${BLYNK_TOKEN}&${GAS_PIN}`);
+        let gas = parseInt(await res.text());
 
-        let alertRes = await fetch(`https://blynk.cloud/external/api/get?token=${BLYNK_TOKEN}&${ALERT_PIN}`);
-        let alert = parseInt(await alertRes.text());
-
-        updateUI(gas, alert);
+        updateUI(gas);
 
     } catch (e) {
         console.log("Error:", e);
@@ -108,27 +112,21 @@ async function fetchData() {
 }
 
 // 🎨 UPDATE UI
-function updateUI(gas, alert) {
+function updateUI(gas) {
 
     document.getElementById("gasValue").innerText = gas;
     document.getElementById("time").innerText = new Date().toLocaleTimeString();
 
-    // Gauge scaling
-    let value = Math.min(gas, 1000);
-    gauge.set(value);
+    // Gauge update
+    gauge.set(gas);
 
-    // Status Logic
+    // Status
     let status = document.getElementById("status");
 
-    if (alert === 1) {
+    if (gas >= THRESHOLD) {
         status.innerText = "DANGER 🚨";
         status.className = "status danger";
-    } 
-    else if (gas > 800) {
-        status.innerText = "WARNING ⚠️";
-        status.className = "status warning";
-    } 
-    else {
+    } else {
         status.innerText = "SAFE ✅";
         status.className = "status safe";
     }
@@ -145,10 +143,9 @@ function updateUI(gas, alert) {
     chart.update();
 }
 
-// ⏱ AUTO REFRESH
+// ⏱ AUTO REFRESH EVERY 2 SEC
 setInterval(fetchData, 2000);
 </script>
 
 </body>
 </html>
-
