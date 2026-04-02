@@ -4,165 +4,131 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Smart Gas Dashboard</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/gaugeJS/dist/gauge.min.js"></script>
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&display=swap" rel="stylesheet">
 <style>
-body {
-    font-family: 'Inter', sans-serif;
-    background: linear-gradient(135deg,#dbeafe,#bfdbfe);
-    margin:0; padding:0;
-    color:#0f172a;
-}
-.header {
-    text-align:center;
-    padding:20px;
-    background: rgba(255,255,255,0.85);
-    backdrop-filter: blur(10px);
-    box-shadow: 0 5px 20px rgba(0,0,0,0.1);
-}
-.header h1 {
-    font-size:3rem;
-    background: linear-gradient(135deg,#1e3a8a,#3b82f6);
-    -webkit-background-clip: text;
-    -webkit-text-fill-color: transparent;
-}
-.card {
-    background: rgba(255,255,255,0.85);
-    backdrop-filter: blur(15px);
-    border-radius: 20px;
-    box-shadow: 0 20px 40px rgba(0,0,0,0.15);
-    margin:20px auto;
-    padding:30px;
-    width: 360px;
-    transition: transform 0.3s, box-shadow 0.3s;
-}
-.card:hover {
-    transform: translateY(-10px);
-    box-shadow: 0 30px 60px rgba(0,0,0,0.25);
-}
-#gasValue { font-size: 48px; font-weight:800; margin:10px 0; }
-#status { font-size: 24px; font-weight:700; margin:15px 0; }
-.safe { color:#16a34a; }
-.alert { color:#f59e0b; }
-.danger { color:#dc2626; }
-#msg { font-size: 16px; color:#475569; margin-top:5px; }
-canvas { margin-top:20px; }
-.grid { display:flex; flex-wrap:wrap; justify-content:center; }
-@media(max-width:400px){ .card { width:90%; } }
-.particles { position: fixed; top:0; left:0; width:100%; height:100%; pointer-events:none; z-index:-1; opacity:0.2; }
-.particle { position:absolute; background: rgba(59, 130, 246, 0.4); border-radius:50%; animation: floatGentle 20s infinite linear; }
-@keyframes floatGentle { 0% { transform: translateY(100vh) scale(0); opacity:0; } 10% { opacity:1; } 90% { opacity:1; } 100% { transform: translateY(-50px) scale(1); opacity:0; } }
+body { font-family: 'Inter', sans-serif; margin:0; padding:0; background:#e0f2fe; }
+header { padding: 1rem; text-align:center; background: #0284c7; color:white; font-size:1.8rem; font-weight:700; }
+main { max-width: 1200px; margin: 2rem auto; display: grid; grid-template-columns: repeat(auto-fit,minmax(320px,1fr)); gap:2rem; }
+.card { background: rgba(255,255,255,0.85); backdrop-filter: blur(10px); border-radius: 15px; padding:2rem; text-align:center; box-shadow:0 10px 25px rgba(0,0,0,0.1);}
+.status { font-size:1.2rem; font-weight:600; margin-top:1rem; }
+.status-safe { color: #16a34a; }
+.status-alert { color: #b45309; }
+.status-danger { color: #dc2626; }
+#gaugeContainer { width:100%; height:250px; margin: 1rem 0; }
+#lastUpdate { font-size:0.9rem; color:#475569; margin-top:0.5rem; display:block; }
+canvas { background:white; border-radius:10px; padding:10px; }
 </style>
 </head>
 <body>
 
-<div class="particles" id="particles"></div>
+<header>Smart Gas Dashboard</header>
 
-<div class="header">
-    <h1>🔥 Smart Gas Dashboard</h1>
-</div>
+<main>
+  <!-- Current Gas Level Card -->
+  <div class="card">
+    <h3>Current Gas Level</h3>
+    <div id="gaugeContainer"></div>
+    <div class="status" id="gasStatus">Loading...</div>
+    <div id="lastUpdate">--</div>
+  </div>
 
-<div class="grid">
-    <div class="card">
-        <h2>Current Gas Level</h2>
-        <div id="gasValue">0</div>
-        <div>PPM</div>
-        <canvas id="gauge" width="300" height="200"></canvas>
-        <h3 id="status" class="safe">SAFE ✅</h3>
-        <p id="msg">Air quality is normal 👍</p>
-        <p>Last Update: <span id="time">--</span></p>
-    </div>
-
-    <div class="card">
-        <h2>Live Trend (Last 20 readings)</h2>
-        <canvas id="chart" height="250"></canvas>
-    </div>
-</div>
+  <!-- Trend Chart Card -->
+  <div class="card">
+    <h3>Live Trend (Last 20 readings)</h3>
+    <canvas id="trendChart" height="250"></canvas>
+  </div>
+</main>
 
 <script>
-const TOKEN = "kknBvWoCIihbDZx2bv258GX_P9YzN6K7";
-const REAL_PIN = "V1";  // Raw MQ2 value
+const TOKEN = "kknBvWoCIihbDZx2bv258GX_P9YzN6K7"; // Blynk token
+const REAL_PIN = "V1"; // Real sensor value from ESP32
 
-// GAUGE setup
-const gauge = new Gauge(document.getElementById("gauge")).setOptions({
-    angle:0.2,
-    lineWidth:0.3,
-    pointer:{length:0.6, strokeWidth:0.05, color:'#000'},
-    staticZones:[
-        {strokeStyle:"#16a34a", min:0, max:1500},
-        {strokeStyle:"#f59e0b", min:1500, max:2500},
-        {strokeStyle:"#dc2626", min:2500, max:4000}
-    ],
-    colorStart:'#000', colorStop:'#000', strokeColor:'#E0E0E0',
-    generateGradient:true,
-    highDpiSupport:true
-});
+// Gauge setup
+const opts = {
+  angle: 0.2,
+  lineWidth: 0.3,
+  radiusScale: 0.9,
+  pointer: { length: 0.6, strokeWidth: 0.035, color:'#000' },
+  limitMax: false,
+  limitMin: false,
+  staticZones: [
+    {strokeStyle:"#16a34a", min:0, max:1500},
+    {strokeStyle:"#f59e0b", min:1500, max:2500},
+    {strokeStyle:"#dc2626", min:2500, max:4000}
+  ],
+  strokeColor:'#eee',
+  generateGradient:true,
+  highDpiSupport:true
+};
+const target = document.getElementById('gaugeContainer');
+const gauge = new Gauge(target).setOptions(opts);
 gauge.maxValue = 4000;
+gauge.setMinValue(0);
 gauge.set(0);
 
-// CHART setup
-let chartData = { labels: [], datasets:[{label:"Gas PPM", data:[], borderColor:"#3b82f6", fill:false, tension:0.3}]};
-const chart = new Chart(document.getElementById("chart"), {type:"line", data:chartData, options:{scales:{y:{min:0,max:4000}}}});
+// Trend Chart setup
+const ctx = document.getElementById('trendChart').getContext('2d');
+let gasHistory = [];
+const trendChart = new Chart(ctx, {
+  type:'line',
+  data: {
+    labels:[],
+    datasets:[{
+      label:'Gas PPM',
+      data: [],
+      backgroundColor: 'rgba(59,130,246,0.2)',
+      borderColor: '#3b82f6',
+      borderWidth: 2,
+      tension:0.3,
+      fill:true,
+    }]
+  },
+  options:{
+    scales:{ y:{ beginAtZero:true, max:4000 }, x:{ ticks:{ autoSkip:true, maxTicksLimit:10 } } },
+    responsive:true,
+    plugins:{ legend:{ display:false } }
+  }
+});
 
-// PARTICLES
-function createParticles(){
-    const p = document.getElementById('particles');
-    for(let i=0;i<30;i++){
-        const particle = document.createElement('div');
-        particle.className='particle';
-        particle.style.left=Math.random()*100+'%';
-        particle.style.width=particle.style.height=(Math.random()*4+1)+'px';
-        particle.style.animationDuration=(Math.random()*15+10)+'s';
-        particle.style.animationDelay=Math.random()*5+'s';
-        p.appendChild(particle);
-    }
-}
-createParticles();
-
-// FETCH DATA
+// Fetch data from Blynk and update UI
 async function fetchData(){
-    try{
-        let res = await fetch(`https://blynk.cloud/external/api/get?token=${TOKEN}&${REAL_PIN}`);
-        let text = await res.text();
-        let gas = parseInt(text.replace(/["\[\]]/g,''));
-        if(isNaN(gas)) gas = 0;
-        updateUI(gas);
-    }catch(e){ console.log("Error:",e);}
-}
+  try{
+    let res = await fetch(`https://blynk.cloud/external/api/get?token=${TOKEN}&${REAL_PIN}`);
+    let json = await res.json();
+    let gas = parseInt(json[0]);
+    if(isNaN(gas)) gas = 0;
 
-// UPDATE DASHBOARD
-function updateUI(gas){
-    document.getElementById("gasValue").innerText = gas;
-    document.getElementById("time").innerText = new Date().toLocaleTimeString();
+    // Update gauge
     gauge.set(gas);
 
-    const status = document.getElementById("status");
-    const msg = document.getElementById("msg");
+    // Update status message
+    let statusText = "";
+    let statusClass = "";
+    if(gas <= 1500){ statusText = "✅ SAFE"; statusClass="status-safe"; }
+    else if(gas <= 2500){ statusText="⚠️ ALERT"; statusClass="status-alert"; }
+    else{ statusText="🚨 DANGER"; statusClass="status-danger"; }
+    const statusEl = document.getElementById("gasStatus");
+    statusEl.textContent = statusText;
+    statusEl.className = "status "+statusClass;
 
-    if(gas <= 1500){
-        status.innerText = "SAFE ✅";
-        status.className = "safe";
-        msg.innerText = "Air quality is normal 👍";
-    } else if(gas <= 2500){
-        status.innerText = "ALERT ⚠️";
-        status.className = "alert";
-        msg.innerText = "Gas level rising ⚠️";
-    } else{
-        status.innerText = "DANGER 🚨";
-        status.className = "danger";
-        msg.innerText = "Gas leak detected! Take action 🔥";
-    }
+    // Update last update time
+    const now = new Date();
+    document.getElementById("lastUpdate").textContent = "Last Update: "+now.toLocaleTimeString();
 
-    // Chart update
-    chartData.labels.push(new Date().toLocaleTimeString());
-    chartData.datasets[0].data.push(gas);
-    if(chartData.labels.length>20){ chartData.labels.shift(); chartData.datasets[0].data.shift(); }
-    chart.update();
+    // Update trend chart
+    gasHistory.push(gas);
+    if(gasHistory.length>20) gasHistory.shift();
+    trendChart.data.labels = gasHistory.map((_,i)=>i+1);
+    trendChart.data.datasets[0].data = gasHistory;
+    trendChart.update();
+
+  }catch(e){ console.log("Error fetching Blynk data:",e);}
 }
 
-// AUTO UPDATE
-setInterval(fetchData, 2000);
+// Fetch every 1 second
+setInterval(fetchData, 1000);
 </script>
 
 </body>
