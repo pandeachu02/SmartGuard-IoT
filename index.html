@@ -7,7 +7,6 @@
 <style>
   body { font-family: Arial, sans-serif; background: #f4f9ff; padding: 20px; }
   .card { background: #fff; border-radius: 10px; padding: 20px; margin: 10px 0; box-shadow: 0 2px 8px rgba(0,0,0,0.1);}
-  .gauge { width: 200px; height: 100px; }
   #currentGas { font-size: 32px; font-weight: bold; }
   #status { font-weight: bold; margin-top: 10px; }
 </style>
@@ -29,17 +28,19 @@
 
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <script>
-  const BLYNK_TOKEN = 'YOUR_BLYNK_TOKEN';  // Replace with your Blynk Auth Token
-  const BLYNK_PIN = 'V1';                   // Virtual Pin where gas PPM is sent
-  const API_URL = `https://blynk.cloud/external/api/get?token=${BLYNK_TOKEN}&pin=${BLYNK_PIN}`;
+  const BLYNK_TOKEN = 'YOUR_BLYNK_TOKEN';  
+  const GAUGE_PIN = 'V0';  // Gauge now uses V0
+  const CHART_PIN = 'V1';  // Chart can stay on V1 if ESP32 sends same value
+  const GAUGE_API = `https://blynk.cloud/external/api/get?token=${BLYNK_TOKEN}&pin=${GAUGE_PIN}`;
+  const CHART_API = `https://blynk.cloud/external/api/get?token=${BLYNK_TOKEN}&pin=${CHART_PIN}`;
 
-  let gasData = []; // Store last 20 readings
+  let gasData = []; // Last 20 readings
 
   const ctx = document.getElementById('gasChart').getContext('2d');
   const gasChart = new Chart(ctx, {
     type: 'line',
     data: {
-      labels: Array(20).fill(''),  // 20 empty labels
+      labels: Array(20).fill(''),
       datasets: [{
         label: 'Gas PPM',
         data: Array(20).fill(0),
@@ -60,19 +61,19 @@
 
   async function updateGasValue() {
     try {
-      const response = await fetch(API_URL);
+      const response = await fetch(GAUGE_API);
       const data = await response.json();
-      const gasValue = parseInt(data[0]); // Extract value from array
+      const gasValue = parseInt(data[0]); 
 
-      // Update current gas display
+      // Update gauge display
       document.getElementById('currentGas').innerText = gasValue;
 
-      // Update status
+      // Update status with same thresholds as gauge color
       const statusEl = document.getElementById('status');
-      if (gasValue < 1000) {
+      if (gasValue < 1500) {
         statusEl.innerText = "SAFE ✅";
         statusEl.style.color = "green";
-      } else if (gasValue < 2500) {
+      } else if (gasValue < 3000) {
         statusEl.innerText = "WARNING ⚠️";
         statusEl.style.color = "orange";
       } else {
@@ -91,9 +92,8 @@
     }
   }
 
-  // Update every 2 seconds
   setInterval(updateGasValue, 2000);
-  updateGasValue(); // Initial call
+  updateGasValue(); 
 </script>
 
 </body>
