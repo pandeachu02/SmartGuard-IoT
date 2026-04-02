@@ -8,85 +8,130 @@
 <script src="https://cdn.jsdelivr.net/npm/gaugeJS/dist/gauge.min.js"></script>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&display=swap" rel="stylesheet">
 <style>
-    body {
-        font-family: 'Inter', sans-serif;
-        background: linear-gradient(135deg,#dbeafe,#bfdbfe);
-        color: #0f172a;
-        margin:0; padding:0; text-align:center;
-    }
-    h1 { font-size:2.8rem; margin:20px 0; background: linear-gradient(135deg,#1e3a8a,#3b82f6); -webkit-background-clip:text; -webkit-text-fill-color:transparent; }
-    .card {
-        background: rgba(255,255,255,0.85);
-        backdrop-filter: blur(15px);
-        border-radius: 20px;
-        box-shadow: 0 20px 40px rgba(0,0,0,0.15);
-        margin:20px auto; padding:30px;
-        width: 360px;
-    }
-    #gasValue { font-size: 48px; font-weight:800; margin:10px 0; }
-    #status { font-size: 24px; font-weight:700; margin:15px 0; }
-    .safe { color:#16a34a; }
-    .alert { color:#f59e0b; }
-    .danger { color:#dc2626; }
-    #msg { font-size: 16px; color:#475569; margin-top:5px; }
-    canvas { margin-top:20px; }
+body {
+    font-family: 'Inter', sans-serif;
+    background: linear-gradient(135deg,#dbeafe,#bfdbfe);
+    margin:0; padding:0;
+    color:#0f172a;
+}
+.header {
+    text-align:center;
+    padding:20px;
+    background: rgba(255,255,255,0.85);
+    backdrop-filter: blur(10px);
+    box-shadow: 0 5px 20px rgba(0,0,0,0.1);
+}
+.header h1 {
+    font-size:3rem;
+    background: linear-gradient(135deg,#1e3a8a,#3b82f6);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+}
+.card {
+    background: rgba(255,255,255,0.85);
+    backdrop-filter: blur(15px);
+    border-radius: 20px;
+    box-shadow: 0 20px 40px rgba(0,0,0,0.15);
+    margin:20px auto;
+    padding:30px;
+    width: 360px;
+    transition: transform 0.3s, box-shadow 0.3s;
+}
+.card:hover {
+    transform: translateY(-10px);
+    box-shadow: 0 30px 60px rgba(0,0,0,0.25);
+}
+#gasValue { font-size: 48px; font-weight:800; margin:10px 0; }
+#status { font-size: 24px; font-weight:700; margin:15px 0; }
+.safe { color:#16a34a; }
+.alert { color:#f59e0b; }
+.danger { color:#dc2626; }
+#msg { font-size: 16px; color:#475569; margin-top:5px; }
+canvas { margin-top:20px; }
+.grid { display:flex; flex-wrap:wrap; justify-content:center; }
+@media(max-width:400px){ .card { width:90%; } }
+.particles { position: fixed; top:0; left:0; width:100%; height:100%; pointer-events:none; z-index:-1; opacity:0.2; }
+.particle { position:absolute; background: rgba(59, 130, 246, 0.4); border-radius:50%; animation: floatGentle 20s infinite linear; }
+@keyframes floatGentle { 0% { transform: translateY(100vh) scale(0); opacity:0; } 10% { opacity:1; } 90% { opacity:1; } 100% { transform: translateY(-50px) scale(1); opacity:0; } }
 </style>
 </head>
 <body>
 
-<h1>🔥 Smart Gas Dashboard</h1>
+<div class="particles" id="particles"></div>
 
-<div class="card">
-    <h2>Current Gas Level</h2>
-    <div id="gasValue">0</div>
-    <div>PPM</div>
-    <canvas id="gauge"></canvas>
-    <h3 id="status" class="safe">SAFE ✅</h3>
-    <p id="msg">Air quality is normal 👍</p>
-    <p>Last Update: <span id="time">--</span></p>
+<div class="header">
+    <h1>🔥 Smart Gas Dashboard</h1>
 </div>
 
-<div class="card">
-    <h2>Live Trend (Last 20 readings)</h2>
-    <canvas id="chart" height="250"></canvas>
+<div class="grid">
+    <div class="card">
+        <h2>Current Gas Level</h2>
+        <div id="gasValue">0</div>
+        <div>PPM</div>
+        <canvas id="gauge" width="300" height="200"></canvas>
+        <h3 id="status" class="safe">SAFE ✅</h3>
+        <p id="msg">Air quality is normal 👍</p>
+        <p>Last Update: <span id="time">--</span></p>
+    </div>
+
+    <div class="card">
+        <h2>Live Trend (Last 20 readings)</h2>
+        <canvas id="chart" height="250"></canvas>
+    </div>
 </div>
 
 <script>
-// ===== BLYNK SETUP =====
 const TOKEN = "kknBvWoCIihbDZx2bv258GX_P9YzN6K7";
-const REAL_PIN = "V1"; // actual sensor value
+const REAL_PIN = "V1";  // Raw MQ2 value
 
-// ===== THRESHOLDS =====
-const THRESHOLD_DANGER = 2500;
-
-// ===== GAUGE =====
+// GAUGE setup
 const gauge = new Gauge(document.getElementById("gauge")).setOptions({
-    angle: 0.2,
-    lineWidth: 0.3,
-    pointer: { length: 0.6 },
-    staticZones: [
-        { strokeStyle: "#16a34a", min: 0, max: 2000 },
-        { strokeStyle: "#f59e0b", min: 2000, max: THRESHOLD_DANGER },
-        { strokeStyle: "#dc2626", min: THRESHOLD_DANGER, max: 4000 }
+    angle:0.2,
+    lineWidth:0.3,
+    pointer:{length:0.6, strokeWidth:0.05, color:'#000'},
+    staticZones:[
+        {strokeStyle:"#16a34a", min:0, max:1500},
+        {strokeStyle:"#f59e0b", min:1500, max:2500},
+        {strokeStyle:"#dc2626", min:2500, max:4000}
     ],
+    colorStart:'#000', colorStop:'#000', strokeColor:'#E0E0E0',
+    generateGradient:true,
+    highDpiSupport:true
 });
 gauge.maxValue = 4000;
 gauge.set(0);
 
-// ===== CHART =====
+// CHART setup
 let chartData = { labels: [], datasets:[{label:"Gas PPM", data:[], borderColor:"#3b82f6", fill:false, tension:0.3}]};
 const chart = new Chart(document.getElementById("chart"), {type:"line", data:chartData, options:{scales:{y:{min:0,max:4000}}}});
 
-// ===== FETCH DATA =====
-async function fetchData() {
-    try {
+// PARTICLES
+function createParticles(){
+    const p = document.getElementById('particles');
+    for(let i=0;i<30;i++){
+        const particle = document.createElement('div');
+        particle.className='particle';
+        particle.style.left=Math.random()*100+'%';
+        particle.style.width=particle.style.height=(Math.random()*4+1)+'px';
+        particle.style.animationDuration=(Math.random()*15+10)+'s';
+        particle.style.animationDelay=Math.random()*5+'s';
+        p.appendChild(particle);
+    }
+}
+createParticles();
+
+// FETCH DATA
+async function fetchData(){
+    try{
         let res = await fetch(`https://blynk.cloud/external/api/get?token=${TOKEN}&${REAL_PIN}`);
-        let gas = parseInt(await res.text());
+        let text = await res.text();
+        let gas = parseInt(text.replace(/["\[\]]/g,''));
+        if(isNaN(gas)) gas = 0;
         updateUI(gas);
-    } catch(e) { console.log("Error:",e); }
+    }catch(e){ console.log("Error:",e);}
 }
 
-// ===== UPDATE DASHBOARD =====
+// UPDATE DASHBOARD
 function updateUI(gas){
     document.getElementById("gasValue").innerText = gas;
     document.getElementById("time").innerText = new Date().toLocaleTimeString();
@@ -95,28 +140,28 @@ function updateUI(gas){
     const status = document.getElementById("status");
     const msg = document.getElementById("msg");
 
-    if(gas < 2000){
+    if(gas <= 1500){
         status.innerText = "SAFE ✅";
         status.className = "safe";
         msg.innerText = "Air quality is normal 👍";
-    } else if(gas < THRESHOLD_DANGER){
+    } else if(gas <= 2500){
         status.innerText = "ALERT ⚠️";
         status.className = "alert";
-        msg.innerText = "Gas level rising, stay cautious 😐";
-    } else {
+        msg.innerText = "Gas level rising ⚠️";
+    } else{
         status.innerText = "DANGER 🚨";
         status.className = "danger";
-        msg.innerText = "Gas leak detected! Take action immediately 🔥";
+        msg.innerText = "Gas leak detected! Take action 🔥";
     }
 
-    // update chart
+    // Chart update
     chartData.labels.push(new Date().toLocaleTimeString());
     chartData.datasets[0].data.push(gas);
-    if(chartData.labels.length > 20){ chartData.labels.shift(); chartData.datasets[0].data.shift(); }
+    if(chartData.labels.length>20){ chartData.labels.shift(); chartData.datasets[0].data.shift(); }
     chart.update();
 }
 
-// ===== AUTO UPDATE =====
+// AUTO UPDATE
 setInterval(fetchData, 2000);
 </script>
 
