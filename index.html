@@ -31,14 +31,12 @@
 
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <script>
-  // ✅ Blynk token from your ESP32 project
   const BLYNK_TOKEN = 'kknBvWoCIihbDZx2bv258GX_P9YzN6K7';  
   const GAUGE_PIN = 'V0';
   const CHART_PIN = 'V1';
   const GAUGE_API = `https://blynk.cloud/external/api/get?token=${BLYNK_TOKEN}&pin=${GAUGE_PIN}`;
-  const CHART_API = `https://blynk.cloud/external/api/get?token=${BLYNK_TOKEN}&pin=${CHART_PIN}`;
 
-  let gasData = []; // Last 20 readings
+  let gasData = [];
   let maxGas = 0;
 
   const ctx = document.getElementById('gasChart').getContext('2d');
@@ -67,21 +65,21 @@
   async function updateGasValue() {
     try {
       const response = await fetch(GAUGE_API);
-      const data = await response.json();
-      const gasValue = parseInt(data[0]); 
+      let text = await response.text(); // Use text() instead of json()
+      let gasValue = parseInt(text);    // Parse directly to integer
 
-      // Update gauge display
+      if (isNaN(gasValue)) gasValue = 0; // fallback
+
       document.getElementById('currentGas').innerText = gasValue;
 
-      // Update max gas value
       if (gasValue > maxGas) {
         maxGas = gasValue;
         document.getElementById('maxGas').innerText = `Max: ${maxGas}`;
       }
 
-      // Update status and card color
       const statusEl = document.getElementById('status');
       const cardEl = document.getElementById('gasCard');
+
       if (gasValue < 1500) {
         statusEl.innerText = "SAFE ✅";
         statusEl.style.color = "green";
@@ -94,29 +92,22 @@
         statusEl.innerText = "DANGER ❌";
         statusEl.style.color = "red";
         cardEl.classList.add('danger');
-        // Optional: play sound alert
         // playBuzzer();
       }
 
-      // Update live trend chart
+      // Update chart
       gasData.push(gasValue);
       if (gasData.length > 20) gasData.shift();
       gasChart.data.datasets[0].data = gasData;
       gasChart.update();
 
-    } catch (error) {
-      console.error('Error fetching gas data:', error);
+    } catch (err) {
+      console.error('Fetch error:', err);
     }
   }
 
-  // Optional buzzer simulation (web sound)
-  function playBuzzer() {
-    const audio = new Audio('https://freesound.org/data/previews/337/337049_3236236-lq.mp3');
-    audio.play();
-  }
-
   setInterval(updateGasValue, 2000);
-  updateGasValue(); 
+  updateGasValue();
 </script>
 
 </body>
