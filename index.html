@@ -1,137 +1,151 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Smart Gas Gauge – Interface Only</title>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
-  <script src="https://cdn.jsdelivr.net/npm/gaugeJS/dist/gauge.min.js"></script>
-  <style>
-    body {
-      font-family: 'Inter', sans-serif;
-      margin: 0;
-      padding: 0;
-      background: #e0f2fe;
-      display: flex;
-      justify-content: center;
-      align-items: center;
-      min-height: 100vh;
-    }
-    main {
-      width: 100%;
-      max-width: 500px;
-      background: rgba(255, 255, 255, 0.95);
-      backdrop-filter: blur(10px);
-      border-radius: 16px;
-      padding: 2rem 1.5rem;
-      box-shadow: 0 10px 25px rgba(0, 0, 0, 0.1);
-      text-align: center;
-    }
-    h1 {
-      margin: 0 0 1rem 0;
-      color: #0369a1;
-      font-size: 1.6rem;
-    }
-    #gaugeContainer {
-      width: 100%;
-      height: 280px;
-      margin: 1rem 0;
-    }
-    #status {
-      font-weight: 600;
-      font-size: 1.2rem;
-      margin: 0.5rem 0;
-    }
-  </style>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Smart Gas Dashboard</title>
+
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/gaugeJS/dist/gauge.min.js"></script>
+
+<style>
+body {
+    font-family: 'Inter', sans-serif;
+    background: #eef5ff;
+    text-align: center;
+}
+
+.card {
+    background: white;
+    padding: 20px;
+    margin: 20px auto;
+    border-radius: 15px;
+    width: 340px;
+    box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+}
+
+h1 { color: #1e3a8a; }
+
+.status {
+    font-size: 22px;
+    font-weight: bold;
+}
+
+.safe { color: green; }
+.danger { color: red; }
+
+canvas { margin-top: 20px; }
+</style>
 </head>
+
 <body>
 
-  <main>
-    <h1>Smart Gas Gauge</h1>
+<h1>🔥 Smart Gas Dashboard</h1>
 
-    <!-- Gauge interface only -->
-    <div id="gaugeContainer"></div>
-    <div id="status">SAFE ✅</div>
-  </main>
+<div class="card">
+    <h2>Gas Value</h2>
+    <div id="gasValue" style="font-size:40px;">0</div>
+    <div>PPM</div>
 
-  <script>
-    const BLYNK_TOKEN = "kknBvWoCIihbDZx2bv258GX_P9YzN6K7";
-    const GAUGE_PIN   = "V0";
-    const GAUGE_API   = `https://blynk.cloud/external/api/get?token=${BLYNK_TOKEN}&pin=${GAUGE_PIN}`;
+    <canvas id="gauge"></canvas>
 
-    const opts = {
-      angle: 0.2,
-      lineWidth: 0.3,
-      radiusScale: 0.9,
-      pointer: {
-        length: 0.6,
-        strokeWidth: 0.035,
-        color: '#000'
-      },
-      limitMax: false,
-      limitMin: false,
-      staticZones: [
-        { strokeStyle: "#16a34a", min:    0, max: 1500 }, // SAFE
-        { strokeStyle: "#f59e0b", min: 1500, max: 3000 }, // WARNING
-        { strokeStyle: "#ef4444", min: 3000, max: 4000 }  // DANGER
-      ],
-      strokeColor: '#eee',
-      generateGradient: true,
-      highDpiSupport: true,
-      // Remove all numeric labels and ticks
-      renderTicks: {
-        divisions: 0,
-        divWidth: 0,
-        divLength: 0,
-        divColor: "#000",
-        subDivisions: 0
-      },
-      staticLabels: {
-        font: "10px sans-serif",
-        labels: [],   // no numbers
-        color: "#000",
-        fractionDigits: 0
-      }
-    };
+    <h3 id="status" class="status safe">SAFE</h3>
+    <p>Last Update: <span id="time">--</span></p>
+</div>
 
-    const gauge = new Gauge(document.getElementById("gaugeContainer")).setOptions(opts);
-    gauge.maxValue = 4000;  // PPM scale
-    gauge.setMinValue(0);
-    gauge.set(0);
+<div class="card">
+    <h2>Live Graph</h2>
+    <canvas id="chart"></canvas>
+</div>
 
-    async function updateGauge() {
-      try {
-        const response = await fetch(GAUGE_API);
-        const text = await response.text();
-        let gasValue = parseInt(text);
+<script>
+// 🔑 BLYNK DETAILS
+const BLYNK_TOKEN = "kknBvWoCIihbDZx2bv258GX_P9YzN6K7";
+const GAS_PIN = "V0";
 
-        if (isNaN(gasValue) || gasValue < 0) gasValue = 0;
-        if (gasValue > 4000) gasValue = 4000;
+// 🎯 THRESHOLD
+const THRESHOLD = 2500;
 
-        // Update gauge pointer only
-        gauge.set(gasValue);
+// 📊 CHART SETUP
+let chartData = {
+    labels: [],
+    datasets: [{
+        label: "Gas Level",
+        data: [],
+        borderWidth: 2,
+        fill: false
+    }]
+};
 
-        // Update status text
-        const statusEl = document.getElementById("status");
-        if (gasValue < 1500) {
-          statusEl.textContent = "SAFE ✅";
-          statusEl.style.color = "#16a34a";
-        } else if (gasValue < 3000) {
-          statusEl.textContent = "WARNING ⚠️";
-          statusEl.style.color = "#f59e0b";
-        } else {
-          statusEl.textContent = "DANGER ❌";
-          statusEl.style.color = "#ef4444";
-        }
-      } catch (err) {
-        console.error("Error fetching Blynk data:", err);
-      }
+const chart = new Chart(document.getElementById("chart"), {
+    type: "line",
+    data: chartData
+});
+
+// 🎯 GAUGE SETUP (MAX = 4000)
+const gauge = new Gauge(document.getElementById("gauge")).setOptions({
+    angle: 0.15,
+    lineWidth: 0.3,
+    pointer: { length: 0.6, strokeWidth: 0.02 },
+    staticZones: [
+        {strokeStyle: "#22c55e", min: 0, max: 2000},   // green
+        {strokeStyle: "#f59e0b", min: 2000, max: 2500},// yellow
+        {strokeStyle: "#ef4444", min: 2500, max: 4000} // red
+    ]
+});
+gauge.maxValue = 4000;
+gauge.setMinValue(0);
+gauge.set(0);
+
+// 🔄 FETCH DATA FROM BLYNK
+async function fetchData() {
+    try {
+        let res = await fetch(`https://blynk.cloud/external/api/get?token=${BLYNK_TOKEN}&${GAS_PIN}`);
+        let gas = parseInt(await res.text());
+
+        updateUI(gas);
+
+    } catch (e) {
+        console.log("Error:", e);
+    }
+}
+
+// 🎨 UPDATE UI
+function updateUI(gas) {
+
+    document.getElementById("gasValue").innerText = gas;
+    document.getElementById("time").innerText = new Date().toLocaleTimeString();
+
+    // Gauge update
+    gauge.set(gas);
+
+    // Status
+    let status = document.getElementById("status");
+
+    if (gas >= THRESHOLD) {
+        status.innerText = "DANGER 🚨";
+        status.className = "status danger";
+    } else {
+        status.innerText = "SAFE ✅";
+        status.className = "status safe";
     }
 
-    // Update every 2 seconds
-    setInterval(updateGauge, 2000);
-    updateGauge();
-  </script>
+    // Chart update
+    chartData.labels.push(new Date().toLocaleTimeString());
+    chartData.datasets[0].data.push(gas);
+
+    if (chartData.labels.length > 20) {
+        chartData.labels.shift();
+        chartData.datasets[0].data.shift();
+    }
+
+    chart.update();
+}
+
+// ⏱ AUTO REFRESH EVERY 2 SEC
+setInterval(fetchData, 2000);
+</script>
 
 </body>
 </html>
